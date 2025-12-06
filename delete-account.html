@@ -147,6 +147,105 @@
             text-decoration: none;
         }
         
+        .delete-form {
+            background: #F8FAFC;
+            padding: 30px;
+            border-radius: 12px;
+            margin: 30px 0;
+            border: 2px solid #EF4444;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            color: #1E293B;
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #CBD5E1;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: #3B82F6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        
+        .delete-button {
+            width: 100%;
+            background: #EF4444;
+            color: white;
+            padding: 14px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+            margin-top: 10px;
+        }
+        
+        .delete-button:hover:not(:disabled) {
+            background: #DC2626;
+        }
+        
+        .delete-button:disabled {
+            background: #94A3B8;
+            cursor: not-allowed;
+        }
+        
+        .message {
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-size: 14px;
+        }
+        
+        .message.success {
+            background: #D1FAE5;
+            color: #065F46;
+            border-left: 4px solid #10B981;
+        }
+        
+        .message.error {
+            background: #FEE2E2;
+            color: #991B1B;
+            border-left: 4px solid #EF4444;
+        }
+        
+        .message.info {
+            background: #DBEAFE;
+            color: #1E40AF;
+            border-left: 4px solid #3B82F6;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #ffffff;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
         @media (max-width: 768px) {
             .container {
                 padding: 20px;
@@ -178,28 +277,45 @@
             </ul>
         </div>
         
-        <h2>How to Delete Your Account</h2>
+        <h2>Delete Your Account</h2>
+        <p>Enter your username and password below to permanently delete your account and all associated data.</p>
         
-        <div class="step">
-            <span class="step-number">1</span>
-            <strong>Open the Overload App</strong>
-            <p>Launch the Overload app on your iOS or Android device and make sure you're logged in.</p>
+        <div class="delete-form">
+            <form id="deleteForm" onsubmit="handleDelete(event)">
+                <div id="messageContainer"></div>
+                
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input 
+                        type="text" 
+                        id="username" 
+                        name="username" 
+                        required 
+                        autocomplete="username"
+                        placeholder="Enter your username"
+                    />
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input 
+                        type="password" 
+                        id="password" 
+                        name="password" 
+                        required 
+                        autocomplete="current-password"
+                        placeholder="Enter your password"
+                    />
+                </div>
+                
+                <button type="submit" id="deleteButton" class="delete-button">
+                    Delete My Account
+                </button>
+            </form>
         </div>
         
-        <div class="step">
-            <span class="step-number">2</span>
-            <strong>Go to Settings</strong>
-            <p>Navigate to the "Workouts" tab and tap the settings icon (⚙️) in the top right corner.</p>
-        </div>
-        
-        <div class="step">
-            <span class="step-number">3</span>
-            <strong>Delete Your Account</strong>
-            <p>Tap "Delete Account" and confirm your decision. Your account and all data will be permanently deleted.</p>
-        </div>
-        
-        <div class="info-box">
-            <p><strong>💡 Tip:</strong> If you have the app installed, you can delete your account directly from within the app using the steps above.</p>
+        <div class="warning-box">
+            <p><strong>⚠️ Final Warning:</strong> This action is permanent and cannot be undone. All your data will be immediately deleted.</p>
         </div>
         
         <h2>Alternative: Request Deletion via Email</h2>
@@ -229,6 +345,98 @@
             </p>
         </div>
     </div>
+    
+    <script>
+        const API_BASE_URL = 'https://7rnvlyt7gctt6tp6ront3fj6n40xkcce.lambda-url.ap-south-1.on.aws';
+        
+        function showMessage(message, type) {
+            const container = document.getElementById('messageContainer');
+            container.innerHTML = `<div class="message ${type}">${message}</div>`;
+            container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+        
+        async function handleDelete(event) {
+            event.preventDefault();
+            
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+            const deleteButton = document.getElementById('deleteButton');
+            
+            // Clear previous messages
+            document.getElementById('messageContainer').innerHTML = '';
+            
+            // Validate inputs
+            if (!username || !password) {
+                showMessage('Please enter both username and password.', 'error');
+                return;
+            }
+            
+            // Disable button and show loading
+            deleteButton.disabled = true;
+            deleteButton.innerHTML = '<span class="loading"></span> Deleting Account...';
+            
+            try {
+                // Step 1: Login to get JWT token
+                showMessage('Authenticating...', 'info');
+                
+                const loginResponse = await fetch(`${API_BASE_URL}/api/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ username, password }),
+                });
+                
+                if (!loginResponse.ok) {
+                    const errorData = await loginResponse.json().catch(() => ({ detail: 'Invalid credentials' }));
+                    throw new Error(errorData.detail || 'Invalid username or password');
+                }
+                
+                const loginData = await loginResponse.json();
+                const token = loginData.access_token;
+                
+                // Step 2: Delete account using the token
+                showMessage('Account authenticated. Deleting account and all data...', 'info');
+                
+                const deleteResponse = await fetch(`${API_BASE_URL}/api/auth/account`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    },
+                });
+                
+                if (!deleteResponse.ok) {
+                    const errorData = await deleteResponse.json().catch(() => ({ detail: 'Failed to delete account' }));
+                    throw new Error(errorData.detail || 'Failed to delete account');
+                }
+                
+                const deleteData = await deleteResponse.json();
+                
+                // Success!
+                showMessage(
+                    `✅ Account deleted successfully!<br><br>` +
+                    `Deleted ${deleteData.deleted_routines || 0} workout routines and ` +
+                    `${deleteData.deleted_sessions || 0} workout sessions.`,
+                    'success'
+                );
+                
+                // Clear form
+                document.getElementById('deleteForm').reset();
+                deleteButton.disabled = true;
+                deleteButton.textContent = 'Account Deleted';
+                
+            } catch (error) {
+                console.error('Delete error:', error);
+                showMessage(
+                    `❌ ${error.message || 'An error occurred while deleting your account. Please try again or contact support.'}`,
+                    'error'
+                );
+                deleteButton.disabled = false;
+                deleteButton.innerHTML = 'Delete My Account';
+            }
+        }
+    </script>
 </body>
 </html>
 
